@@ -1,4 +1,5 @@
 import json
+import traceback
 from PIL import Image
 import io
 import boto3
@@ -78,9 +79,13 @@ def exif_handler(event, context):
                     failed_count += 1
                     error_msg = f"Failed to process {object_key}: {str(e)}"
                     print(error_msg)
+                    print(f"Exception type: {type(e).__name__}")
+                    print(f"Traceback: {traceback.format_exc()}")
 
         except Exception as e:
             print(f"Failed to process SNS record: {str(e)}")
+            print(f"Exception type: {type(e).__name__}")
+            print(f"Traceback: {traceback.format_exc()}")
             failed_count += 1
 
     summary = {
