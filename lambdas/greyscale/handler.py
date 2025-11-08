@@ -31,13 +31,10 @@ def greyscale_handler(event, context):
     processed_count = 0
     failed_count = 0
 
-    # iterate over all SNS records
     for sns_record in event.get('Records', []):
         try:
-            # extract and parse SNS message
             sns_message = json.loads(sns_record['Sns']['Message'])
 
-            # iterate over all S3 records in the SNS message
             for s3_event in sns_message.get('Records', []):
                 try:
                     s3_record = s3_event['s3']
@@ -46,11 +43,20 @@ def greyscale_handler(event, context):
 
                     print(f"Processing: s3://{bucket_name}/{object_key}")
 
-                    ######
-                    #
-                    #  TODO: add greyscale lambda code here
-                    #
-                    ######
+                    image = download_from_s3(bucket_name, object_key)
+
+                    grey_image = image.convert("L")
+
+                    key_parts = Path(object_key)
+                    parts = key_parts.parts
+                    if len(parts) > 1:
+                        new_key = str(Path('greyscale', *parts[1:]))
+                    else:
+                        new_key = str(Path('greyscale', key_parts.name))
+
+                    print(f"Saving greyscale image to s3://{bucket_name}/{new_key}")
+
+                    upload_to_s3(bucket_name, new_key, grey_image)
 
                     processed_count += 1
 

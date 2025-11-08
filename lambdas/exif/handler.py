@@ -31,13 +31,10 @@ def exif_handler(event, context):
     processed_count = 0
     failed_count = 0
 
-    # iterate over all SNS records
     for sns_record in event.get('Records', []):
         try:
-            # extract and parse SNS message
             sns_message = json.loads(sns_record['Sns']['Message'])
 
-            # iterate over all S3 records in the SNS message
             for s3_event in sns_message.get('Records', []):
                 try:
                     s3_record = s3_event['s3']
@@ -46,11 +43,34 @@ def exif_handler(event, context):
 
                     print(f"Processing: s3://{bucket_name}/{object_key}")
 
-                    ######
-                    #
-                    #  TODO: add exif lambda code here
-                    #
-                    ######
+                    image = download_from_s3(bucket_name, object_key)
+
+                    exif_data = image._getexif()
+                    exif_dict = {}
+
+                    if exif_data is not None:
+                        from PIL.ExifTags import TAGS
+                        for tag_id, value in exif_data.items():
+                            tag = TAGS.get(tag_id, tag_id)
+                            if isinstance(value, bytes):
+                                try:
+                                    value = value.decode(errors="replace")
+                                except Exception:
+                                    value = str(value)
+                            exif_dict[tag] = value
+                    else:
+                        print(f"No EXIF data found for {object_key}")
+
+                    key_parts = Path(object_key)
+                    parts = key_parts.parts
+                    if len(parts) > 1:
+                        new_key = str(Path('exif', *parts[1:])).rsplit('.', 1)[0] + '.json'
+                    else:
+                        new_key = str(Path('exif', key_parts.name)).rsplit('.', 1)[0] + '.json'
+
+                    print(f"Saving EXIF data to s3://{bucket_name}/{new_key}")
+
+                    upload_to_s3(bucket_name, new_key, json.dumps(exif_dict, indent=2), content_type='application/json')
 
                     processed_count += 1
 
@@ -64,7 +84,7 @@ def exif_handler(event, context):
             failed_count += 1
 
     summary = {
-        'statusCode': 200 if failed_count == 0 else 207,  # @note: 207 = multi-status
+        'statusCode': 200 if failed_count == 0 else 207,
         'processed': processed_count,
         'failed': failed_count,
     }

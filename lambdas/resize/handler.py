@@ -1,4 +1,5 @@
 import json
+import traceback
 from PIL import Image
 import io
 import boto3
@@ -31,13 +32,10 @@ def resize_handler(event, context):
     processed_count = 0
     failed_count = 0
 
-    # iterate over all SNS records
     for sns_record in event.get('Records', []):
         try:
-            # extract and parse SNS message
             sns_message = json.loads(sns_record['Sns']['Message'])
 
-            # iterate over all S3 records in the SNS message
             for s3_event in sns_message.get('Records', []):
                 try:
                     s3_record = s3_event['s3']
@@ -46,11 +44,17 @@ def resize_handler(event, context):
 
                     print(f"Processing: s3://{bucket_name}/{object_key}")
 
-                    ######
-                    #
-                    #  TODO: add resize lambda code here
-                    #
-                    ######
+                    image = download_from_s3(bucket_name, object_key)
+                    
+                    max_size = (800, 600)
+                    image.thumbnail(max_size, Image.Resampling.LANCZOS)
+                    
+                    filename = Path(object_key).name
+                    output_key = f"processed/resize/{filename}"
+                    
+                    upload_to_s3(bucket_name, output_key, image)
+                    
+                    print(f"Resized image saved to: s3://{bucket_name}/{output_key}")
 
                     processed_count += 1
 
@@ -58,13 +62,17 @@ def resize_handler(event, context):
                     failed_count += 1
                     error_msg = f"Failed to process {object_key}: {str(e)}"
                     print(error_msg)
+                    print(f"Exception type: {type(e).__name__}")
+                    print(f"Traceback: {traceback.format_exc()}")
 
         except Exception as e:
             print(f"Failed to process SNS record: {str(e)}")
+            print(f"Exception type: {type(e).__name__}")
+            print(f"Traceback: {traceback.format_exc()}")
             failed_count += 1
 
     summary = {
-        'statusCode': 200 if failed_count == 0 else 207,  # @note: 207 = multi-status
+        'statusCode': 200 if failed_count == 0 else 207,
         'processed': processed_count,
         'failed': failed_count,
     }
