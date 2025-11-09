@@ -58,16 +58,21 @@ def exif_handler(event, context):
                                     value = value.decode(errors="replace")
                                 except Exception:
                                     value = str(value)
+                            elif hasattr(value, '__iter__') and not isinstance(value, (str, bytes)):
+                                try:
+                                    value = [float(v) if hasattr(v, 'numerator') else v for v in value]
+                                except:
+                                    value = str(value)
+                            elif hasattr(value, 'numerator'):
+                                value = float(value)
+                            elif not isinstance(value, (str, int, float, bool, type(None))):
+                                value = str(value)
                             exif_dict[tag] = value
                     else:
                         print(f"No EXIF data found for {object_key}")
 
-                    key_parts = Path(object_key)
-                    parts = key_parts.parts
-                    if len(parts) > 1:
-                        new_key = str(Path('exif', *parts[1:])).rsplit('.', 1)[0] + '.json'
-                    else:
-                        new_key = str(Path('exif', key_parts.name)).rsplit('.', 1)[0] + '.json'
+                    filename = Path(object_key).stem
+                    new_key = f"processed/exif/{filename}.json"
 
                     print(f"Saving EXIF data to s3://{bucket_name}/{new_key}")
 

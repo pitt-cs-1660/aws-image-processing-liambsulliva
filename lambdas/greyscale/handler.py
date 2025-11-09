@@ -48,12 +48,8 @@ def greyscale_handler(event, context):
 
                     grey_image = image.convert("L")
 
-                    key_parts = Path(object_key)
-                    parts = key_parts.parts
-                    if len(parts) > 1:
-                        new_key = str(Path('greyscale', *parts[1:]))
-                    else:
-                        new_key = str(Path('greyscale', key_parts.name))
+                    filename = Path(object_key).name
+                    new_key = f"processed/greyscale/{filename}"
 
                     print(f"Saving greyscale image to s3://{bucket_name}/{new_key}")
 
